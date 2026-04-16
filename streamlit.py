@@ -29,9 +29,6 @@ def load_data():
     if "Serial_No" in df.columns:
         df = df.drop("Serial_No", axis=1)
 
-    # Create a binary class only for visualization
-    df["Admit_Class"] = (df["Admit_Chance"] >= 0.75).astype(int)
-
     return df
 
 
@@ -68,12 +65,12 @@ Research = st.sidebar.selectbox(
 predict_button = st.sidebar.button("🚀 Predict My Admission Chance")
 
 
-# Main header
+# Header
 st.markdown("# 🎓 UCLA Admission Predictor")
-st.write("Predict your admission chance using a trained Neural Network model.")
+st.write("Predict your admission chance using a trained Neural Network regression model.")
 
 
-# Prediction section
+# Prediction
 if predict_button:
     research_value = 1 if Research == "Yes" else 0
 
@@ -89,18 +86,16 @@ if predict_button:
 
     input_scaled = scaler.transform(input_df)
     prediction = float(model.predict(input_scaled)[0])
-
-    # Keep prediction inside valid probability range
     prediction = max(0.0, min(1.0, prediction))
 
     st.markdown("## 🎯 Prediction Result")
 
     if prediction < 0.40:
-        st.error(f"❌ Low chance of admission. (Probability: {prediction:.2f})")
+        st.error(f"❌ Low chance of admission. (Predicted chance: {prediction:.2f})")
     elif prediction < 0.75:
-        st.warning(f"⚠️ Moderate chance of admission. (Probability: {prediction:.2f})")
+        st.warning(f"⚠️ Moderate chance of admission. (Predicted chance: {prediction:.2f})")
     else:
-        st.success(f"✅ High chance of admission! (Probability: {prediction:.2f})")
+        st.success(f"✅ High chance of admission. (Predicted chance: {prediction:.2f})")
 
     st.markdown(
         f"""
@@ -117,7 +112,6 @@ if predict_button:
         unsafe_allow_html=True
     )
 
-    # Show training loss curve if available
     if hasattr(model, "loss_curve_"):
         with st.expander("📉 Show Model Loss Curve"):
             fig_loss, ax_loss = plt.subplots(figsize=(8, 4))
@@ -129,50 +123,66 @@ if predict_button:
             st.pyplot(fig_loss)
 
 
-# Graphs
+# Visuals
 st.markdown("## 📊 Admission Data Insights")
 
 col1, col2 = st.columns(2)
 
 with col1:
-    st.markdown("### GRE vs TOEFL Scores by Admission Chance")
+    st.markdown("### GRE vs TOEFL Scores by Admit Chance")
     fig1, ax1 = plt.subplots(figsize=(7, 5))
-    sns.scatterplot(
-        data=df,
-        x="GRE_Score",
-        y="TOEFL_Score",
-        hue="Admit_Class",
-        palette="Set1",
-        ax=ax1
+    scatter1 = ax1.scatter(
+        df["GRE_Score"],
+        df["TOEFL_Score"],
+        c=df["Admit_Chance"],
+        cmap="viridis",
+        alpha=0.8
     )
-    ax1.set_title("GRE vs TOEFL Score by Admission Chance")
+    ax1.set_title("GRE vs TOEFL Colored by Admit Chance")
+    ax1.set_xlabel("GRE Score")
+    ax1.set_ylabel("TOEFL Score")
+    fig1.colorbar(scatter1, ax=ax1, label="Admit Chance")
     st.pyplot(fig1)
 
 with col2:
-    st.markdown("### CGPA Distribution by Admission Chance")
+    st.markdown("### CGPA Distribution")
     fig2, ax2 = plt.subplots(figsize=(7, 5))
-    sns.histplot(
-        data=df,
-        x="CGPA",
-        hue="Admit_Class",
-        kde=True,
-        bins=15,
-        ax=ax2
-    )
-    ax2.set_title("CGPA Distribution by Admission Chance")
+    sns.histplot(data=df, x="CGPA", kde=True, bins=15, ax=ax2)
+    ax2.set_title("CGPA Distribution")
+    ax2.set_xlabel("CGPA")
+    ax2.set_ylabel("Count")
     st.pyplot(fig2)
 
 st.markdown("## Relationships Between GRE, TOEFL, and CGPA")
 
-pairplot_df = df[["GRE_Score", "TOEFL_Score", "CGPA", "Admit_Class"]].copy()
+st.markdown("### Pairplot Colored by Continuous Admit Chance")
+
+pairplot_df = df[["GRE_Score", "TOEFL_Score", "CGPA", "Admit_Chance"]].copy()
 
 pairplot_fig = sns.pairplot(
     pairplot_df,
     vars=["GRE_Score", "TOEFL_Score", "CGPA"],
-    hue="Admit_Class",
-    diag_kind="kde",
+    hue="Admit_Chance",
+    palette="viridis",
+    diag_kind="hist",
     plot_kws={"s": 50, "alpha": 0.8}
 )
 
 st.pyplot(pairplot_fig.fig)
 
+st.markdown("### Actual vs Predicted Admit Chance")
+
+full_X = df.drop("Admit_Chance", axis=1)
+full_y = df["Admit_Chance"]
+full_X_scaled = scaler.transform(full_X)
+full_pred = model.predict(full_X_scaled)
+
+fig3, ax3 = plt.subplots(figsize=(8, 6))
+sns.scatterplot(x=full_y, y=full_pred, ax=ax3)
+min_val = min(np.min(full_y), np.min(full_pred))
+max_val = max(np.max(full_y), np.max(full_pred))
+ax3.plot([min_val, max_val], [min_val, max_val], linestyle="--")
+ax3.set_title("Actual vs Predicted Admit Chance")
+ax3.set_xlabel("Actual Admit Chance")
+ax3.set_ylabel("Predicted Admit Chance")
+st.pyplot(fig3)
